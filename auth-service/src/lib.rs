@@ -9,6 +9,7 @@ use tower_http::services::ServeDir;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::domain::data_stores::UserStore;
 use crate::services::hashmap_user_store::HashmapUserStore;
 
 // This struct encapsulates our application-related logic.
@@ -45,7 +46,7 @@ impl Application {
 
 
 // Using a type alias to improve readability!
-pub type UserStoreType = Arc<RwLock<HashmapUserStore>>;
+pub type UserStoreType = Arc<RwLock<dyn UserStore>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -55,5 +56,14 @@ pub struct AppState {
 impl AppState {
     pub fn new(user_store: UserStoreType) -> Self {
         Self { user_store }
+    }
+}
+
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            user_store: Arc::new(RwLock::new(HashmapUserStore::default())),
+        }
     }
 }

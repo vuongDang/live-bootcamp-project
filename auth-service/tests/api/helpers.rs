@@ -8,9 +8,7 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let app_state = auth_service::AppState::new(
-            auth_service::UserStoreType::default(),
-        );
+        let app_state = auth_service::AppState::default();
         let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build app");
@@ -29,7 +27,7 @@ impl TestApp {
             address,
             http_client,
         };
-        
+
         test_app
     }
 
@@ -87,5 +85,5 @@ impl TestApp {
 }
 
 pub fn get_random_email() -> String {
-    format!("{}@example.com", Uuid::new_v4()) 
+    format!("{}@example.com", Uuid::new_v4())
 }
