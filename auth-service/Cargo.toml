@@ -6,8 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
-reqwest = { version = "0.11.26", default-features = false, features = ["json"] }
-fake = { version = "4"}
+reqwest = { version = "0.11.26", default-features = false, features = [
+    "json",
+    "cookies",
+] }
+fake = { version = "4" }
 quickcheck = "1"
 
 [dependencies]
@@ -19,3 +22,8 @@ serde_json = "1.0"
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
 regex = "1.8.5"
 async-trait = "0.1.78"
+axum-extra = { version = "0.9.2", features = ["cookie"] }
+jsonwebtoken = "9.2"
+chrono = "0.4"
+dotenvy = "0.15.7"
+lazy_static = "1.4"

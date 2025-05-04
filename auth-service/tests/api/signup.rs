@@ -4,7 +4,6 @@ use auth_service::error::ErrorResponse;
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
     let app = TestApp::new().await;
-
     let random_email = get_random_email();
 
     let test_cases = [
@@ -93,8 +92,8 @@ async fn should_return_400_if_invalid_input() {
             "failed for input: {:?}",
             test_case
         );
-        
-         assert_eq!(
+
+        assert_eq!(
             response
                 .json::<ErrorResponse>()
                 .await
@@ -129,8 +128,8 @@ async fn should_return_409_if_email_already_exists() {
         "failed for input: {:?}",
         test_case
     );
-    
-     assert_eq!(
+
+    assert_eq!(
         response
             .json::<ErrorResponse>()
             .await

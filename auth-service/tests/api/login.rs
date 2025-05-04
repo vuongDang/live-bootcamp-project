@@ -1,4 +1,5 @@
 use crate::helpers::{get_random_email, TestApp};
+use auth_service::utils::constants::JWT_COOKIE_NAME;
 
 async fn app_signup() -> (TestApp, String, String) {
     let app = TestApp::new().await;
@@ -16,21 +17,32 @@ async fn app_signup() -> (TestApp, String, String) {
         response.status().as_u16(),
         201,
         "failed signup for input: {:?}",
-       signup_body 
+        signup_body
     );
     (app, email, password.to_string())
 }
 
 #[tokio::test]
-async fn valid_login_returns_200() {
+async fn valid_login_without_2fa_returns_200() {
     let (app, email, password) = app_signup().await;
-    
+
     let login_body = serde_json::json!({
         "email": email,
         "password": password,
     });
     let response = app.post_login(&login_body).await;
-    assert_eq!(response.status().as_u16(), 200, "failed login for input: {:?}", login_body);
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "failed login for input: {:?}",
+        login_body
+    );
+
+    let auth_cookie = response
+        .cookies()
+        .find(|c| c.name() == JWT_COOKIE_NAME)
+        .expect("auth_cookie not found in response cookies");
+    assert!(auth_cookie.value().len() > 0, "auth_cookie is empty");
 }
 
 #[tokio::test]
@@ -43,20 +55,24 @@ async fn malformed_login_returns_422() {
         serde_json::json!({
             "email": email,
         }),
-        serde_json::json!({
-                  }),
+        serde_json::json!({}),
     ];
-    
+
     for test_case in test_cases.iter() {
         let response = app.post_login(test_case).await;
-        assert_eq!(response.status().as_u16(), 422, "failed for input: {:?}", test_case);
+        assert_eq!(
+            response.status().as_u16(),
+            422,
+            "failed for input: {:?}",
+            test_case
+        );
     }
 }
 
 #[tokio::test]
 async fn invalid_login_returns_400() {
     let (app, email, password) = app_signup().await;
-    
+
     let test_cases = [
         serde_json::json!({
             "email": "wrong_email",
@@ -71,17 +87,22 @@ async fn invalid_login_returns_400() {
             "password": "wrong_password",
         }),
     ];
-    
+
     for test_case in test_cases.iter() {
         let response = app.post_login(test_case).await;
-        assert_eq!(response.status().as_u16(), 400, "failed for input: {:?}", test_case);
+        assert_eq!(
+            response.status().as_u16(),
+            400,
+            "failed for input: {:?}",
+            test_case
+        );
     }
 }
 
 #[tokio::test]
 async fn incorrect_login_returns_401() {
     let (app, email, password) = app_signup().await;
-    
+
     let test_cases = [
         serde_json::json!({
             "email": get_random_email(),
@@ -96,9 +117,14 @@ async fn incorrect_login_returns_401() {
             "password": "wrong_password12345",
         }),
     ];
-    
+
     for test_case in test_cases.iter() {
         let response = app.post_login(test_case).await;
-        assert_eq!(response.status().as_u16(), 401, "failed for input: {:?}", test_case);
+        assert_eq!(
+            response.status().as_u16(),
+            401,
+            "failed for input: {:?}",
+            test_case
+        );
     }
 }

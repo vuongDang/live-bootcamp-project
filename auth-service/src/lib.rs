@@ -1,16 +1,16 @@
 mod domain;
 mod routes;
 mod services;
-pub use domain::error;
-
-use axum::{routing::post, serve::Serve, Router};
-use std::error::Error;
-use tower_http::services::ServeDir;
+pub mod utils;
+use crate::domain::data_stores::UserStore;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
+use crate::services::hashmap_user_store::HashmapUserStore;
+use axum::{routing::post, serve::Serve, Router};
+pub use domain::error;
+use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::domain::data_stores::UserStore;
-use crate::services::hashmap_user_store::HashmapUserStore;
+use tower_http::services::ServeDir;
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -44,7 +44,6 @@ impl Application {
     }
 }
 
-
 // Using a type alias to improve readability!
 pub type UserStoreType = Arc<RwLock<dyn UserStore>>;
 
@@ -58,7 +57,6 @@ impl AppState {
         Self { user_store }
     }
 }
-
 
 impl Default for AppState {
     fn default() -> Self {
