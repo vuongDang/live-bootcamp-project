@@ -3,19 +3,19 @@ pub struct Email(pub String);
 
 impl Email {
     pub fn parse(email: &str) -> Result<Self, String> {
-        if is_valid_email(email) {
+        if Email::is_valid(email) {
             Ok(Email(email.to_string()))
-        } else { 
+        } else {
             Err("Email not valid".to_string())
-        } 
+        }
     }
-}
 
-// Simple regex for email validation
-pub(crate) fn is_valid_email(email: &str) -> bool {
-    let re = regex::Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-        .expect("Failed to compile regex");
-    re.is_match(email)
+    // Simple regex for email validation
+    pub fn is_valid(email: &str) -> bool {
+        let re = regex::Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+            .expect("Failed to compile regex");
+        re.is_match(email)
+    }
 }
 
 impl AsRef<str> for Email {
@@ -66,7 +66,7 @@ mod tests {
         fn test_invalid_email_with_quickcheck(email: String) -> bool {
             let simple_check = email.is_empty() || !email.contains("@") || !email.contains(".");
             if simple_check {
-                is_valid_email(&email) == false
+                Email::is_valid(&email) == false
             } else {
                 true
             }

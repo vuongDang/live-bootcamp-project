@@ -3,17 +3,17 @@ pub struct Password(pub String);
 
 impl Password {
     pub fn parse(password: &str) -> Result<Self, String> {
-        if is_valid_password(password) {
+        if Password::is_valid(password) {
             Ok(Password(password.to_string()))
         } else {
             Err("Password not valid".to_string())
         }
     }
-}
 
-// Password must be at least 8 characters long and contain at least one digit
-fn is_valid_password(password: &str) -> bool {
-    password.len() >= 8 && password.chars().any(|c| c.is_digit(10))
+    // Password must be at least 8 characters long and contain at least one digit
+    pub fn is_valid(password: &str) -> bool {
+        password.len() >= 8 && password.chars().any(|c| c.is_digit(10))
+    }
 }
 
 impl AsRef<str> for Password {

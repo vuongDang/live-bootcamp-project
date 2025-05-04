@@ -6,6 +6,7 @@ pub enum AuthAPIError {
     UserAlreadyExists,
     InvalidCredentials,
     UnexpectedError,
+    AuthenticationFailure,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -21,6 +22,7 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
+            AuthAPIError::AuthenticationFailure => (StatusCode::UNAUTHORIZED, "Authentication failure"),
         };
         let body = Json(ErrorResponse {
             error: error_message.to_string(),
