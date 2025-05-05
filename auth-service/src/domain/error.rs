@@ -1,12 +1,17 @@
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::{Deserialize, Serialize};
-
 
 pub enum AuthAPIError {
     UserAlreadyExists,
     InvalidCredentials,
     UnexpectedError,
     AuthenticationFailure,
+    MissingToken,
+    InvalidToken,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -22,7 +27,11 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
-            AuthAPIError::AuthenticationFailure => (StatusCode::UNAUTHORIZED, "Authentication failure"),
+            AuthAPIError::AuthenticationFailure => {
+                (StatusCode::UNAUTHORIZED, "Authentication failure")
+            }
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token"),
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing token"),
         };
         let body = Json(ErrorResponse {
             error: error_message.to_string(),

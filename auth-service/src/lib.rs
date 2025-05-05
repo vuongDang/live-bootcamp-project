@@ -5,11 +5,13 @@ pub mod utils;
 use crate::domain::data_stores::UserStore;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use crate::services::hashmap_user_store::HashmapUserStore;
+use axum::http::Method;
 use axum::{routing::post, serve::Serve, Router};
 pub use domain::error;
 use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
 // This struct encapsulates our application-related logic.
@@ -22,6 +24,18 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
+        // Allow the app service(running on our local machine and in production) to call the auth service
+        let allowed_origins = [
+            "http://localhost:8000".parse()?,
+            "http://[157.245.129.227]:8000".parse()?,
+        ];
+
+        let cors = CorsLayer::new()
+            .allow_methods([Method::POST, Method::GET])
+            .allow_origin(allowed_origins)
+            // Allow cookies to be included in requests
+            .allow_credentials(true);
+
         let router = Router::new()
             .nest_service("/", ServeDir::new("assets"))
             .route("/signup", post(signup))
@@ -29,7 +43,8 @@ impl Application {
             .route("/logout", post(logout))
             .route("/verify-2fa", post(verify_2fa))
             .route("/verify-token", post(verify_token))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(cors);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
