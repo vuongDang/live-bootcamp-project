@@ -1,4 +1,5 @@
 use auth_service::app_state::*;
+use auth_service::routes::LoginResponse;
 use auth_service::utils::constants::test;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use auth_service::Application;
@@ -94,6 +95,7 @@ impl TestApp {
     {
         self.http_client
             .post(&format!("{}/verify-2fa", &self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
@@ -140,7 +142,7 @@ pub async fn app_signup(with_2fa: bool) -> (TestApp, String, String) {
 /// This function will sign up a user and then log them in, returning the app instance, email, password, and auth cookie.
 pub async fn app_signup_and_login(
     with_2fa: bool,
-) -> (TestApp, String, String, String, Option<String>) {
+) -> (TestApp, String, String, Option<String>, Option<String>) {
     let (app, email, password) = app_signup(with_2fa).await;
 
     let login_body = serde_json::json!({
@@ -148,27 +150,43 @@ pub async fn app_signup_and_login(
         "password": password.clone(),
     });
 
+    let expected_code = if with_2fa { 206 } else { 200 };
     let response = app.post_login(&login_body).await;
     assert_eq!(
         response.status().as_u16(),
-        200,
+        expected_code,
         "failed login for input: {:?}",
         login_body
     );
-    let auth_cookie = response
-        .cookies()
-        .find(|c| c.name() == JWT_COOKIE_NAME)
-        .expect("auth_cookie not found in response cookies");
-    assert!(auth_cookie.value().len() > 0, "auth_cookie is empty");
 
-    app.cookie_jar.add_cookie_str(
-        &format!(
-            "{}={}; HttpOnly; SameSite=Lax; Secure; Path=/",
-            JWT_COOKIE_NAME,
-            auth_cookie.value()
-        ),
-        &reqwest::Url::parse(&app.address).expect("Failed to parse URL"),
-    );
+    if !with_2fa {
+        let auth_cookie = response
+            .cookies()
+            .find(|c| c.name() == JWT_COOKIE_NAME)
+            .expect("auth_cookie not found in response cookies");
+        assert!(auth_cookie.value().len() > 0, "auth_cookie is empty");
 
-    (app, email, password, auth_cookie.value().to_string(), None)
+        app.cookie_jar.add_cookie_str(
+            &format!(
+                "{}={}; HttpOnly; SameSite=Lax; Secure; Path=/",
+                JWT_COOKIE_NAME,
+                auth_cookie.value()
+            ),
+            &reqwest::Url::parse(&app.address).expect("Failed to parse URL"),
+        );
+        (
+            app,
+            email,
+            password,
+            Some(auth_cookie.value().to_string()),
+            None,
+        )
+    } else {
+        let login_response = response.json::<LoginResponse>().await.unwrap();
+        let login_attempt_id: Option<String> = match login_response {
+            LoginResponse::With2FA(response) => Some(response.login_attempt_id),
+            _ => None,
+        };
+        (app, email, password, None, login_attempt_id)
+    }
 }

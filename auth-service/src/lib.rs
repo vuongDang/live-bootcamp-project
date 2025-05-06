@@ -7,6 +7,7 @@ use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use app_state::AppState;
 use axum::http::Method;
 use axum::{routing::post, serve::Serve, Router};
+pub use domain::data_stores::{LoginAttemptId, TwoFACode};
 pub use domain::email::Email;
 pub use domain::error;
 use std::error::Error;

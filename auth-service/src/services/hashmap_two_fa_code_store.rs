@@ -5,7 +5,7 @@ use crate::domain::{
     email::Email,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct HashmapTwoFACodeStore {
     codes: HashMap<Email, (TwoFACode, LoginAttemptId)>,
 }

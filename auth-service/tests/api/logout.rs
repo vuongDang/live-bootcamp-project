@@ -18,7 +18,12 @@ async fn should_return_200_if_jwt_is_valid() {
         jar_state.is_none(),
         "cookie jar should be empty after logout"
     );
-    let is_token_banned = app.banned_tokens.read().await.is_token_banned(&jwt).await;
+    let is_token_banned = app
+        .banned_tokens
+        .read()
+        .await
+        .is_token_banned(&jwt.unwrap())
+        .await;
     assert!(is_token_banned.is_ok());
     assert!(is_token_banned.unwrap());
 }

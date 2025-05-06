@@ -1,7 +1,6 @@
 use crate::domain::data_stores::{LoginAttemptId, TwoFACode, UserStoreError};
 use crate::domain::email::Email;
 use crate::domain::password::Password;
-use crate::domain::EmailClient;
 use crate::utils::auth::generate_auth_cookie;
 use crate::{error::AuthAPIError, AppState};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
@@ -109,7 +108,7 @@ async fn handle_2fa(
     ))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum LoginResponse {
     No2FA,

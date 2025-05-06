@@ -32,7 +32,7 @@ pub trait BannedTokenStore: Send + Sync {
 }
 
 #[async_trait::async_trait]
-pub trait TwoFACodeStore: Send + Sync {
+pub trait TwoFACodeStore: Send + Sync + std::fmt::Debug {
     async fn add_code(
         &mut self,
         email: &Email,
