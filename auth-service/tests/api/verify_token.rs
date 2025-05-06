@@ -1,4 +1,4 @@
-use crate::helpers::{app_signup, app_signup_and_login};
+use crate::helpers::app_signup_and_login;
 use auth_service::utils::auth::generate_auth_cookie;
 use auth_service::Email;
 
@@ -43,7 +43,16 @@ async fn should_return_422_if_jwt_cookie_missing() {
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
     // Signup but do not login
-    let (app, email, _) = app_signup().await;
+    let (app, email, _, jwt) = app_signup_and_login().await;
+
+    // Ban the jwt token
+    let response = app.post_logout().await;
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "failed for logout with cookie jar: {:?}",
+        app.cookie_jar
+    );
 
     let test_cases = [
         serde_json::json!({
@@ -51,6 +60,10 @@ async fn should_return_401_if_invalid_token() {
         }),
         serde_json::json!({
             "token": generate_auth_cookie(&Email::parse(&email).unwrap()).unwrap().to_string(),
+        }),
+        // jwt that was banned
+        serde_json::json!({
+            "token": jwt,
         }),
     ];
 

@@ -5,7 +5,7 @@ use reqwest::Url;
 
 #[tokio::test]
 async fn should_return_200_if_jwt_is_valid() {
-    let (app, _, _, _) = app_signup_and_login().await;
+    let (app, _, _, jwt) = app_signup_and_login().await;
     let response = app.post_logout().await;
     assert_eq!(
         response.status().as_u16(),
@@ -18,6 +18,9 @@ async fn should_return_200_if_jwt_is_valid() {
         jar_state.is_none(),
         "cookie jar should be empty after logout"
     );
+    let is_token_banned = app.banned_tokens.read().await.is_token_banned(&jwt).await;
+    assert!(is_token_banned.is_ok());
+    assert!(is_token_banned.unwrap());
 }
 
 #[tokio::test]

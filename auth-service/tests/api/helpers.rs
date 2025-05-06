@@ -1,6 +1,7 @@
 use auth_service::utils::constants::test;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use auth_service::Application;
+use auth_service::BannedTokenStoreType;
 use reqwest::cookie::Jar;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -9,11 +10,13 @@ pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
+    pub banned_tokens: BannedTokenStoreType,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
         let app_state = auth_service::AppState::default();
+        let banned_tokens = app_state.banned_token_store.clone();
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
             .expect("Failed to build app");
@@ -36,6 +39,7 @@ impl TestApp {
             address,
             cookie_jar,
             http_client,
+            banned_tokens,
         };
 
         test_app

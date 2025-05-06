@@ -7,7 +7,10 @@ use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use crate::services::hashmap_user_store::HashmapUserStore;
 use axum::http::Method;
 use axum::{routing::post, serve::Serve, Router};
+use domain::data_stores::BannedTokenStore;
+pub use domain::email::Email;
 pub use domain::error;
+use services::hashset_banned_token_store::HashsetBannedTokenStore;
 use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -61,15 +64,20 @@ impl Application {
 
 // Using a type alias to improve readability!
 pub type UserStoreType = Arc<RwLock<dyn UserStore>>;
+pub type BannedTokenStoreType = Arc<RwLock<dyn BannedTokenStore>>;
 
 #[derive(Clone)]
 pub struct AppState {
     pub user_store: UserStoreType,
+    pub banned_token_store: BannedTokenStoreType,
 }
 
 impl AppState {
-    pub fn new(user_store: UserStoreType) -> Self {
-        Self { user_store }
+    pub fn new(user_store: UserStoreType, banned_token_store: BannedTokenStoreType) -> Self {
+        Self {
+            user_store,
+            banned_token_store,
+        }
     }
 }
 
@@ -77,6 +85,7 @@ impl Default for AppState {
     fn default() -> Self {
         Self {
             user_store: Arc::new(RwLock::new(HashmapUserStore::default())),
+            banned_token_store: Arc::new(RwLock::new(HashsetBannedTokenStore::default())),
         }
     }
 }
