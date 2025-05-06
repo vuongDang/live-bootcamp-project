@@ -1,7 +1,7 @@
+use auth_service::app_state::*;
 use auth_service::utils::constants::test;
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use auth_service::Application;
-use auth_service::BannedTokenStoreType;
 use reqwest::cookie::Jar;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -11,12 +11,14 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_tokens: BannedTokenStoreType,
+    pub two_fa_code_store: TwoFACodeStoreType,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
-        let app_state = auth_service::AppState::default();
+        let app_state = AppState::default();
         let banned_tokens = app_state.banned_token_store.clone();
+        let two_fa_code_store = app_state.two_fa_code_store.clone();
         let app = Application::build(app_state, test::APP_ADDRESS)
             .await
             .expect("Failed to build app");
@@ -40,6 +42,7 @@ impl TestApp {
             cookie_jar,
             http_client,
             banned_tokens,
+            two_fa_code_store,
         };
 
         test_app
@@ -85,7 +88,10 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_verify_2fa(&self) -> reqwest::Response {
+    pub async fn post_verify_2fa<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/verify-2fa", &self.address))
             .send()
@@ -110,7 +116,7 @@ pub fn get_random_email() -> String {
     format!("{}@example.com", Uuid::new_v4())
 }
 
-pub async fn app_signup() -> (TestApp, String, String) {
+pub async fn app_signup(with_2fa: bool) -> (TestApp, String, String) {
     let app = TestApp::new().await;
     let email = get_random_email();
     let password = "password123";
@@ -118,7 +124,7 @@ pub async fn app_signup() -> (TestApp, String, String) {
     let signup_body = serde_json::json!({
         "email": email.clone(),
         "password": password,
-        "requires2FA": true
+        "requires2FA": with_2fa
     });
 
     let response = app.post_signup(&signup_body).await;
@@ -132,8 +138,10 @@ pub async fn app_signup() -> (TestApp, String, String) {
 }
 
 /// This function will sign up a user and then log them in, returning the app instance, email, password, and auth cookie.
-pub async fn app_signup_and_login() -> (TestApp, String, String, String) {
-    let (app, email, password) = app_signup().await;
+pub async fn app_signup_and_login(
+    with_2fa: bool,
+) -> (TestApp, String, String, String, Option<String>) {
+    let (app, email, password) = app_signup(with_2fa).await;
 
     let login_body = serde_json::json!({
         "email": email.clone(),
@@ -162,5 +170,5 @@ pub async fn app_signup_and_login() -> (TestApp, String, String, String) {
         &reqwest::Url::parse(&app.address).expect("Failed to parse URL"),
     );
 
-    (app, email, password, auth_cookie.value().to_string())
+    (app, email, password, auth_cookie.value().to_string(), None)
 }

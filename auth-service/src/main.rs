@@ -3,7 +3,7 @@ use auth_service::Application;
 
 #[tokio::main]
 async fn main() {
-    let state = auth_service::AppState::default();
+    let state = auth_service::app_state::AppState::default();
     let app = Application::build(state, prod::APP_ADDRESS)
         .await
         .expect("Failed to build the app");

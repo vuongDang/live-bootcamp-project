@@ -1,10 +1,11 @@
 use crate::helpers::{app_signup, get_random_email};
 use auth_service::utils::constants::JWT_COOKIE_NAME;
+use auth_service::{routes::TwoFactorLoginResponse, Email};
 use reqwest::{cookie::CookieStore, Url};
 
 #[tokio::test]
 async fn valid_login_without_2fa_returns_200() {
-    let (app, email, password) = app_signup().await;
+    let (app, email, password) = app_signup(false).await;
 
     let login_body = serde_json::json!({
         "email": email,
@@ -34,7 +35,7 @@ async fn valid_login_without_2fa_returns_200() {
 
 #[tokio::test]
 async fn malformed_login_returns_422() {
-    let (app, email, password) = app_signup().await;
+    let (app, email, password) = app_signup(false).await;
     let test_cases = [
         serde_json::json!({
             "password": password,
@@ -58,7 +59,7 @@ async fn malformed_login_returns_422() {
 
 #[tokio::test]
 async fn invalid_login_returns_400() {
-    let (app, email, password) = app_signup().await;
+    let (app, email, password) = app_signup(false).await;
 
     let test_cases = [
         serde_json::json!({
@@ -88,7 +89,7 @@ async fn invalid_login_returns_400() {
 
 #[tokio::test]
 async fn incorrect_login_returns_401() {
-    let (app, email, password) = app_signup().await;
+    let (app, email, password) = app_signup(false).await;
 
     let test_cases = [
         serde_json::json!({
@@ -114,4 +115,42 @@ async fn incorrect_login_returns_401() {
             test_case
         );
     }
+}
+
+#[tokio::test]
+async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
+    let (app, email, pwd) = app_signup(true).await;
+    let login_body = serde_json::json!({
+        "email": email,
+        "password": pwd,
+    });
+
+    let response = app.post_login(&login_body).await;
+    assert_eq!(
+        response.status().as_u16(),
+        206,
+        "failed login for input: {:?}",
+        login_body
+    );
+
+    let response_body: Result<TwoFactorLoginResponse, reqwest::Error> = response.json().await;
+    assert!(
+        response_body.is_ok(),
+        "Missing response body: {:?}",
+        response_body
+    );
+    let response_body = response_body.unwrap();
+    let attempt_id_from_response = response_body.login_attempt_id;
+    let attempt_id_from_store = app
+        .two_fa_code_store
+        .read()
+        .await
+        .get_code(&Email::parse(&email).unwrap())
+        .await;
+    let attempt_id_from_store = attempt_id_from_store.unwrap().1;
+    assert_eq!(
+        attempt_id_from_response,
+        attempt_id_from_store.as_ref(),
+        "login_attempt_id code from response and store do not match"
+    );
 }
