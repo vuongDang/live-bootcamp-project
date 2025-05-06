@@ -5,7 +5,7 @@ use reqwest::Url;
 
 #[tokio::test]
 async fn should_return_200_if_jwt_is_valid() {
-    let (app, _, _) = app_signup_and_login().await;
+    let (app, _, _, _) = app_signup_and_login().await;
     let response = app.post_logout().await;
     assert_eq!(
         response.status().as_u16(),

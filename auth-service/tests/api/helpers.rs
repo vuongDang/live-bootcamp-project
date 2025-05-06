@@ -89,9 +89,13 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn post_verify_token(&self) -> reqwest::Response {
+    pub async fn post_verify_token<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/verify-token", &self.address))
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
@@ -123,7 +127,8 @@ pub async fn app_signup() -> (TestApp, String, String) {
     (app, email, password.to_string())
 }
 
-pub async fn app_signup_and_login() -> (TestApp, String, String) {
+/// This function will sign up a user and then log them in, returning the app instance, email, password, and auth cookie.
+pub async fn app_signup_and_login() -> (TestApp, String, String, String) {
     let (app, email, password) = app_signup().await;
 
     let login_body = serde_json::json!({
@@ -153,5 +158,5 @@ pub async fn app_signup_and_login() -> (TestApp, String, String) {
         &reqwest::Url::parse(&app.address).expect("Failed to parse URL"),
     );
 
-    (app, email, password)
+    (app, email, password, auth_cookie.value().to_string())
 }
