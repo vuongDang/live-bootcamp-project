@@ -8,18 +8,18 @@ on:
   workflow_dispatch:
 
 env:
-  - SQLX_OFFLINE: true
+  SQLX_OFFLINE: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     services:
-      postgres: 
+      postgres:
         image: postgres:15.2-alpine
-        env: 
+        env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }} 
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
@@ -30,91 +30,91 @@ jobs:
 
     steps:
       # Checkout code from the repository
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      # Cache dependencies to speed up build times
-    - name: Cache dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          app-service/.cargo
-          app-service/target/
-          auth-service/.cargo
-          auth-service/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+        # Cache dependencies to speed up build times
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            app-service/.cargo
+            app-service/target/
+            auth-service/.cargo
+            auth-service/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
-    - name: Install Rust
-      run: rustup update stable && rustup default stable
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
 
-    - name: Build and test app-service code
-      working-directory: ./app-service
-      run: |
-        export JWT_SECRET=secret
-        export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
-        cargo build --verbose
-        cargo test --verbose
+      - name: Build and test app-service code
+        working-directory: ./app-service
+        run: |
+          export JWT_SECRET=secret
+          export DATABASE_URL=postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432
+          cargo build --verbose
+          cargo test --verbose
 
-    - name: Build and test auth-service code
-      working-directory: ./auth-service
-      run: |
-        export JWT_SECRET=dummy_secret
-        cargo build --verbose
-        cargo test --verbose
+      - name: Build and test auth-service code
+        working-directory: ./auth-service
+        run: |
+          export JWT_SECRET=dummy_secret
+          cargo build --verbose
+          cargo test --verbose
 
-      # Set up Docker Buildx for multi-platform builds
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+        # Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Build and push Docker images
-      uses: docker/bake-action@v2.3.0
-      with:
-        push: true
-        files: |
-          compose.yml
-          compose.override.yml
-        set: |
-          *.cache-from=type=gha
-          *.cache-to=type=gha,mode=max
+      - name: Build and push Docker images
+        uses: docker/bake-action@v2.3.0
+        with:
+          push: true
+          files: |
+            compose.yml
+            compose.override.yml
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Install sshpass
-      run: sudo apt-get install sshpass
+      - name: Install sshpass
+        run: sudo apt-get install sshpass
 
-    - name: Copy compose.yml to droplet
-      run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
+      - name: Copy compose.yml to droplet
+        run: sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
 
-    - name: Deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ vars.DROPLET_IP }}
-        username: root
-        password: ${{ secrets.DROPLET_PASSWORD }}
-        script: |
-          cd ~
-          export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
-          export JWT_SECRET=${{ secrets.JWT_SECRET }}
-          export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          docker compose down
-          docker compose pull
-          docker compose up -d
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ vars.DROPLET_IP }}
+          username: root
+          password: ${{ secrets.DROPLET_PASSWORD }}
+          script: |
+            cd ~
+            export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
+            export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            docker compose down
+            docker compose pull
+            docker compose up -d
