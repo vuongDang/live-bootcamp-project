@@ -48,7 +48,7 @@ pub enum BannedTokenStoreError {
 }
 
 #[async_trait::async_trait]
-pub trait TwoFACodeStore: Send + Sync + std::fmt::Debug {
+pub trait TwoFACodeStore: Send + Sync {
     async fn add_code(
         &mut self,
         email: &Email,
@@ -65,7 +65,7 @@ pub trait TwoFACodeStore: Send + Sync + std::fmt::Debug {
 #[derive(Debug)]
 pub enum TwoFACodeStoreError {
     LoginAttemptIdNotFound,
-    UnexpectedError,
+    UnexpectedError(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

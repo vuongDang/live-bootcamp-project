@@ -3,6 +3,7 @@ use auth_service::get_postgres_pool;
 use auth_service::routes::LoginResponse;
 use auth_service::utils::constants::*;
 use auth_service::Application;
+use auth_service::PostgresUserStore;
 use reqwest::cookie::Jar;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgPoolOptions;
@@ -12,7 +13,6 @@ use sqlx::PgConnection;
 use sqlx::PgPool;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub struct TestApp {
@@ -27,17 +27,11 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let mut app_state = AppState::default();
+        let mut app_state = AppState::new_ps_redis().await;
 
-        // Use the postgres database for testing
-        let (pg_pool, db_name) = configure_postgresql().await;
-        let user_store = auth_service::PostgresUserStore::new(pg_pool);
-        app_state.user_store = Arc::new(RwLock::new(user_store));
-
-        // Use redis for banned tokens
-        let redis_banned_token_store =
-            auth_service::RedisBannedTokenStore::new(Arc::new(RwLock::new(configure_redis())));
-        app_state.banned_token_store = Arc::new(RwLock::new(redis_banned_token_store));
+        // Reconfigure the PostgreSQL database for testing and get db name
+        let (db_pool, db_name) = configure_postgresql_test().await;
+        app_state.user_store = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(db_pool)));
 
         let banned_tokens = app_state.banned_token_store.clone();
         let two_fa_code_store = app_state.two_fa_code_store.clone();
@@ -235,7 +229,7 @@ pub async fn app_signup_and_login(
 // This function creates a new database for each test case to ensure isolation
 // and runs the necessary migrations.
 // It returns the database connection pool and the database name.
-async fn configure_postgresql() -> (PgPool, String) {
+async fn configure_postgresql_test() -> (PgPool, String) {
     let postgresql_conn_url = DATABASE_URL.to_owned();
 
     // We are creating a new database for each test case, and we need to ensure each database has a unique name!
@@ -312,11 +306,4 @@ async fn delete_database(db_name: &str) {
         .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
         .await
         .expect("Failed to drop the database.");
-}
-
-fn configure_redis() -> redis::Connection {
-    auth_service::get_redis_client(REDIS_HOST_NAME.to_owned())
-        .expect("Failed to get Redis client")
-        .get_connection()
-        .expect("Failed to get Redis connection")
 }

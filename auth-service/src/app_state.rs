@@ -2,9 +2,16 @@ use crate::domain::data_stores::BannedTokenStore;
 use crate::domain::data_stores::TwoFACodeStore;
 use crate::domain::data_stores::UserStore;
 use crate::domain::EmailClient;
+use crate::get_postgres_pool;
+use crate::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
 use crate::services::data_stores::hashmap_user_store::HashmapUserStore;
 use crate::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
-use crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
+use crate::services::data_stores::redis_two_fa_code_store::RedisTwoFACodeStore;
+use crate::utils::constants::DATABASE_URL;
+use crate::utils::constants::REDIS_HOST_NAME;
+use crate::PostgresUserStore;
+use crate::RedisBannedTokenStore;
+use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -36,6 +43,28 @@ impl AppState {
             email_client,
         }
     }
+
+    /// Creates a new AppState with a PostgreSQL user store and a Redis banned token store / two fa code store.
+    pub async fn new_ps_redis() -> Self {
+        let pg_pool = configure_postgresql().await;
+        let user_store = Arc::new(RwLock::new(PostgresUserStore::new(pg_pool)));
+        let banned_token_store = Arc::new(RwLock::new(RedisBannedTokenStore::new(Arc::new(
+            RwLock::new(configure_redis()),
+        ))));
+        let two_fa_code_store = Arc::new(RwLock::new(RedisTwoFACodeStore::new(Arc::new(
+            RwLock::new(configure_redis()),
+        ))));
+        let email_client = Arc::new(RwLock::new(
+            crate::services::mock_email_client::MockEmailClient::default(),
+        ));
+
+        Self {
+            user_store,
+            banned_token_store,
+            two_fa_code_store,
+            email_client,
+        }
+    }
 }
 
 impl Default for AppState {
@@ -49,4 +78,26 @@ impl Default for AppState {
             )),
         }
     }
+}
+
+async fn configure_postgresql() -> PgPool {
+    // Create a new database connection pool
+    let pg_pool = get_postgres_pool(&DATABASE_URL)
+        .await
+        .expect("Failed to create Postgres connection pool!");
+
+    // Run database migrations against our test database!
+    sqlx::migrate!()
+        .run(&pg_pool)
+        .await
+        .expect("Failed to run migrations");
+
+    pg_pool
+}
+
+fn configure_redis() -> redis::Connection {
+    crate::get_redis_client(REDIS_HOST_NAME.to_owned())
+        .expect("Failed to get Redis client")
+        .get_connection()
+        .expect("Failed to get Redis connection")
 }
