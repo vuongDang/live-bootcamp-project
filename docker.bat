@@ -1,7 +1,7 @@
 REM Description: This script loads environment variables from a .env file and runs docker-compose commands.
 REM This script is intended to be run in a Windows environment when running Docker locally.
 
-REM @ECHO OFF
+@ECHO OFF
 
 REM Define the location of the .env file (relative path)
 SET ENV_FILE=auth-service\.env

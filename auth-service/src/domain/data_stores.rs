@@ -36,9 +36,15 @@ impl From<sqlx::Error> for UserStoreError {
 /// This module defines the data store for banned tokens.
 #[async_trait::async_trait]
 pub trait BannedTokenStore: Send + Sync {
-    async fn add_banned_token(&mut self, token: &str) -> Result<(), UserStoreError>;
-    async fn is_token_banned(&self, token: &str) -> Result<bool, UserStoreError>;
-    async fn remove_banned_token(&mut self, token: &str) -> Result<(), UserStoreError>;
+    async fn add_banned_token(&mut self, token: &str) -> Result<(), BannedTokenStoreError>;
+    async fn is_token_banned(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn remove_banned_token(&mut self, token: &str) -> Result<(), BannedTokenStoreError>;
+}
+
+#[derive(Debug)]
+pub enum BannedTokenStoreError {
+    ConnectionError,
+    UnexpectedError(String),
 }
 
 #[async_trait::async_trait]

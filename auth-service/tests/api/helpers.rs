@@ -1,9 +1,7 @@
 use auth_service::app_state::*;
 use auth_service::get_postgres_pool;
 use auth_service::routes::LoginResponse;
-use auth_service::utils::constants::test;
-use auth_service::utils::constants::DATABASE_URL;
-use auth_service::utils::constants::JWT_COOKIE_NAME;
+use auth_service::utils::constants::*;
 use auth_service::Application;
 use reqwest::cookie::Jar;
 use sqlx::postgres::PgConnectOptions;
@@ -35,6 +33,11 @@ impl TestApp {
         let (pg_pool, db_name) = configure_postgresql().await;
         let user_store = auth_service::PostgresUserStore::new(pg_pool);
         app_state.user_store = Arc::new(RwLock::new(user_store));
+
+        // Use redis for banned tokens
+        let redis_banned_token_store =
+            auth_service::RedisBannedTokenStore::new(Arc::new(RwLock::new(configure_redis())));
+        app_state.banned_token_store = Arc::new(RwLock::new(redis_banned_token_store));
 
         let banned_tokens = app_state.banned_token_store.clone();
         let two_fa_code_store = app_state.two_fa_code_store.clone();
@@ -309,4 +312,11 @@ async fn delete_database(db_name: &str) {
         .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
         .await
         .expect("Failed to drop the database.");
+}
+
+fn configure_redis() -> redis::Connection {
+    auth_service::get_redis_client(REDIS_HOST_NAME.to_owned())
+        .expect("Failed to get Redis client")
+        .get_connection()
+        .expect("Failed to get Redis connection")
 }

@@ -10,7 +10,9 @@ use axum::{routing::post, serve::Serve, Router};
 pub use domain::data_stores::{LoginAttemptId, TwoFACode};
 pub use domain::error;
 pub use domain::{email::Email, password::Password, user::User};
+use redis::{Client, RedisResult};
 pub use services::data_stores::postgres_user_store::PostgresUserStore;
+pub use services::data_stores::redis_banned_token_store::RedisBannedTokenStore;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::error::Error;
@@ -65,4 +67,9 @@ impl Application {
 pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
     // Create a new PostgreSQL connection pool
     PgPoolOptions::new().max_connections(5).connect(url).await
+}
+
+pub fn get_redis_client(redis_hostname: String) -> RedisResult<Client> {
+    let redis_url = format!("redis://{}/", redis_hostname);
+    redis::Client::open(redis_url)
 }

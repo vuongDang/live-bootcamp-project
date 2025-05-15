@@ -3,8 +3,8 @@ use crate::domain::data_stores::TwoFACodeStore;
 use crate::domain::data_stores::UserStore;
 use crate::domain::EmailClient;
 use crate::services::data_stores::hashmap_user_store::HashmapUserStore;
+use crate::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
 use crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
-use crate::services::hashset_banned_token_store::HashsetBannedTokenStore;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
