@@ -9,7 +9,7 @@ use crate::domain::user::User;
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
-    async fn get_user(&self, email: &Email) -> Result<&User, UserStoreError>;
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
     async fn validate_user(&self, email: &Email, password: &Password)
         -> Result<(), UserStoreError>;
 }
@@ -21,6 +21,16 @@ pub enum UserStoreError {
     UserNotFound,
     InvalidCredentials,
     UnexpectedError,
+}
+
+impl From<sqlx::Error> for UserStoreError {
+    fn from(err: sqlx::Error) -> Self {
+        match err {
+            sqlx::Error::RowNotFound => UserStoreError::UserNotFound,
+            sqlx::Error::Database(_) => UserStoreError::UnexpectedError,
+            _ => UserStoreError::UnexpectedError,
+        }
+    }
 }
 
 /// This module defines the data store for banned tokens.
@@ -85,8 +95,8 @@ impl AsRef<str> for LoginAttemptId {
 pub struct TwoFACode(String);
 impl TwoFACode {
     pub fn new() -> Self {
-        let mut rng = rand::rng();
-        let random: u32 = rng.random_range(0..1_000_000);
+        let mut rng = rand::thread_rng();
+        let random: u32 = rng.gen_range(0..1_000_000);
         let random_string = format!("{:06}", random);
         TwoFACode(random_string)
     }

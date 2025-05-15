@@ -8,8 +8,11 @@ use app_state::AppState;
 use axum::http::Method;
 use axum::{routing::post, serve::Serve, Router};
 pub use domain::data_stores::{LoginAttemptId, TwoFACode};
-pub use domain::email::Email;
 pub use domain::error;
+pub use domain::{email::Email, password::Password, user::User};
+pub use services::data_stores::postgres_user_store::PostgresUserStore;
+use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use std::error::Error;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -57,4 +60,9 @@ impl Application {
     pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
     }
+}
+
+pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
+    // Create a new PostgreSQL connection pool
+    PgPoolOptions::new().max_connections(5).connect(url).await
 }

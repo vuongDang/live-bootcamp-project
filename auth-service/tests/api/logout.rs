@@ -5,7 +5,7 @@ use reqwest::Url;
 
 #[tokio::test]
 async fn should_return_200_if_jwt_is_valid() {
-    let (app, _, _, jwt, _) = app_signup_and_login(false).await;
+    let (mut app, _, _, jwt, _) = app_signup_and_login(false).await;
     let response = app.post_logout().await;
     assert_eq!(
         response.status().as_u16(),
@@ -26,12 +26,13 @@ async fn should_return_200_if_jwt_is_valid() {
         .await;
     assert!(is_token_banned.is_ok());
     assert!(is_token_banned.unwrap());
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_jwt_cookie_missing() {
     // Signup but do not login
-    let (app, _, _) = app_signup(false).await;
+    let (mut app, _, _) = app_signup(false).await;
 
     let response = app.post_logout().await;
     assert_eq!(
@@ -40,12 +41,13 @@ async fn should_return_400_if_jwt_cookie_missing() {
         "failed for logout with cookie jar: {:?}",
         app.cookie_jar
     );
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
     // Signup but do not login
-    let (app, _, _) = app_signup(false).await;
+    let (mut app, _, _) = app_signup(false).await;
 
     // add invalid cookie
     app.cookie_jar.add_cookie_str(
@@ -62,4 +64,5 @@ async fn should_return_401_if_invalid_token() {
         "failed for logout with cookie jar: {:?}",
         app.cookie_jar
     );
+    app.cleanup().await;
 }

@@ -5,7 +5,7 @@ use reqwest::{cookie::CookieStore, Url};
 
 #[tokio::test]
 async fn valid_login_without_2fa_returns_200() {
-    let (app, email, password) = app_signup(false).await;
+    let (mut app, email, password) = app_signup(false).await;
 
     let login_body = serde_json::json!({
         "email": email,
@@ -31,11 +31,12 @@ async fn valid_login_without_2fa_returns_200() {
         jar_state.is_some(),
         "cookie jar should be empty after logout"
     );
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn malformed_login_returns_422() {
-    let (app, email, password) = app_signup(false).await;
+    let (mut app, email, password) = app_signup(false).await;
     let test_cases = [
         serde_json::json!({
             "password": password,
@@ -55,11 +56,12 @@ async fn malformed_login_returns_422() {
             test_case
         );
     }
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn invalid_login_returns_400() {
-    let (app, email, password) = app_signup(false).await;
+    let (mut app, email, password) = app_signup(false).await;
 
     let test_cases = [
         serde_json::json!({
@@ -85,11 +87,12 @@ async fn invalid_login_returns_400() {
             test_case
         );
     }
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn incorrect_login_returns_401() {
-    let (app, email, password) = app_signup(false).await;
+    let (mut app, email, password) = app_signup(false).await;
 
     let test_cases = [
         serde_json::json!({
@@ -115,11 +118,13 @@ async fn incorrect_login_returns_401() {
             test_case
         );
     }
+
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
-    let (app, email, pwd) = app_signup(true).await;
+    let (mut app, email, pwd) = app_signup(true).await;
     let login_body = serde_json::json!({
         "email": email,
         "password": pwd,
@@ -153,4 +158,5 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         attempt_id_from_store.as_ref(),
         "login_attempt_id code from response and store do not match"
     );
+    app.cleanup().await;
 }

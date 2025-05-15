@@ -4,7 +4,7 @@ use auth_service::Email;
 
 #[tokio::test]
 async fn should_return_200_if_jwt_is_valid() {
-    let (app, _, _, jwt, _) = app_signup_and_login(false).await;
+    let (mut app, _, _, jwt, _) = app_signup_and_login(false).await;
     let body = serde_json::json!({
         "token": jwt,
     });
@@ -16,12 +16,13 @@ async fn should_return_200_if_jwt_is_valid() {
         "failed for verify_token with cookie jar: {:?}",
         app.cookie_jar
     );
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_422_if_jwt_cookie_missing() {
     // Signup but do not login
-    let (app, _, _, _, _) = app_signup_and_login(false).await;
+    let (mut app, _, _, _, _) = app_signup_and_login(false).await;
     let test_cases = [
         serde_json::json!({
             "ton": "invalid_token",
@@ -38,12 +39,13 @@ async fn should_return_422_if_jwt_cookie_missing() {
             app.cookie_jar
         );
     }
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
     // Signup but do not login
-    let (app, email, _, jwt, _) = app_signup_and_login(false).await;
+    let (mut app, email, _, jwt, _) = app_signup_and_login(false).await;
 
     // Ban the jwt token
     let response = app.post_logout().await;
@@ -76,4 +78,5 @@ async fn should_return_401_if_invalid_token() {
             app.cookie_jar
         );
     }
+    app.cleanup().await;
 }

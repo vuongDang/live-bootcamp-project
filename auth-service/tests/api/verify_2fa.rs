@@ -4,7 +4,7 @@ use reqwest::{cookie::CookieStore, Url};
 
 #[tokio::test]
 async fn should_return_200_if_valid_credentials_and_2fa_enabled() {
-    let (app, email, _, _, login_attempt_id_from_response) = app_signup_and_login(true).await;
+    let (mut app, email, _, _, login_attempt_id_from_response) = app_signup_and_login(true).await;
     let (two_fa_code, login_attempt_id) = app
         .two_fa_code_store
         .read()
@@ -49,11 +49,12 @@ async fn should_return_200_if_valid_credentials_and_2fa_enabled() {
         jar_state.is_some(),
         "cookie jar should be empty after logout"
     );
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn returns_422_if_json_body_malformed() {
-    let (app, email, _, _, login_attempt_id) = app_signup_and_login(true).await;
+    let (mut app, email, _, _, login_attempt_id) = app_signup_and_login(true).await;
 
     let test_cases = vec![
         // Missing email
@@ -81,11 +82,12 @@ async fn returns_422_if_json_body_malformed() {
             body
         );
     }
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn returns_400_if_invalid_input() {
-    let (app, email, _, _, login_attempt_id) = app_signup_and_login(true).await;
+    let (mut app, email, _, _, login_attempt_id) = app_signup_and_login(true).await;
     let login_attempt_id = login_attempt_id.clone().unwrap();
 
     let test_cases = vec![
@@ -116,12 +118,13 @@ async fn returns_400_if_invalid_input() {
             body
         );
     }
+    app.cleanup().await;
 }
 
 #[tokio::test]
 async fn return_401_if_invalid_credentials() {
     for _ in 0..1 {
-        let (app, email, _, _, _) = app_signup_and_login(true).await;
+        let (mut app, email, _, _, _) = app_signup_and_login(true).await;
         let body = serde_json::json!({
             "email": email,
             "loginAttemptId": LoginAttemptId::new().as_ref(),
@@ -134,12 +137,13 @@ async fn return_401_if_invalid_credentials() {
             "failed for input: {:?}",
             body
         );
+        app.cleanup().await;
     }
 }
 
 #[tokio::test]
 async fn return_401_if_same_code_twice() {
-    let (app, email, _, _, login_attempt_id_from_response) = app_signup_and_login(true).await;
+    let (mut app, email, _, _, login_attempt_id_from_response) = app_signup_and_login(true).await;
     let (two_fa_code, login_attempt_id) = app
         .two_fa_code_store
         .read()
@@ -180,4 +184,5 @@ async fn return_401_if_same_code_twice() {
         "failed for input: {:?}",
         body
     );
+    app.cleanup().await;
 }
