@@ -3,8 +3,9 @@ use argon2::{
     PasswordVerifier, Version,
 };
 
-use color_eyre::eyre::eyre;
 use color_eyre::eyre::Result;
+use secrecy::ExposeSecret;
+use secrecy::Secret;
 use sqlx::PgPool;
 
 use crate::domain::data_stores::{UserStore, UserStoreError};
@@ -39,7 +40,7 @@ impl UserStore for PostgresUserStore {
         }
 
         // Hash the password before storing it
-        let password_hash = compute_password_hash(user.password.0)
+        let password_hash = compute_password_hash(user.password.as_ref().clone())
             .await
             .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
 
@@ -74,13 +75,11 @@ impl UserStore for PostgresUserStore {
         .await?;
 
         match user {
-            Some(user) => Ok(User {
-                email: Email::parse(&user.email)
-                    .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
-                password: Password::parse(&user.password_hash)
-                    .map_err(|e| UserStoreError::UnexpectedError(eyre!(e)))?,
-                requires_2fa: user.requires_2fa,
-            }),
+            Some(user) => Ok(User::new_with_fake_password(
+                user.email,
+                Secret::new(user.password_hash),
+                user.requires_2fa,
+            )?),
             None => Err(UserStoreError::UserNotFound),
         }
     }
@@ -106,7 +105,7 @@ impl UserStore for PostgresUserStore {
         match record {
             Some(record) => {
                 // Verify the password hash
-                verify_password_hash(record.password_hash, password.0.clone())
+                verify_password_hash(record.password_hash, password.as_ref().clone())
                     .await
                     .map_err(|_| UserStoreError::InvalidCredentials)?;
                 Ok(())
@@ -120,7 +119,7 @@ impl UserStore for PostgresUserStore {
 #[tracing::instrument(name = "Verifying password hash", skip_all)]
 async fn verify_password_hash(
     expected_password_hash: String,
-    password_candidate: String,
+    password_candidate: Secret<String>,
 ) -> color_eyre::eyre::Result<()> {
     let current_span = tracing::Span::current();
     tokio::task::spawn_blocking(move || {
@@ -128,7 +127,10 @@ async fn verify_password_hash(
             let expected_password_hash: PasswordHash<'_> =
                 PasswordHash::new(&expected_password_hash)?;
             Argon2::default()
-                .verify_password(password_candidate.as_bytes(), &expected_password_hash)
+                .verify_password(
+                    password_candidate.expose_secret().as_bytes(),
+                    &expected_password_hash,
+                )
                 .map_err(|e| e.into())
         })
     })
@@ -137,7 +139,7 @@ async fn verify_password_hash(
 
 // Helper function to hash passwords before persisting them in the database.
 #[tracing::instrument(name = "Computing password hash", skip_all)]
-async fn compute_password_hash(password: String) -> color_eyre::eyre::Result<String> {
+async fn compute_password_hash(password: Secret<String>) -> color_eyre::eyre::Result<String> {
     let current_span = tracing::Span::current();
     tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
@@ -147,7 +149,7 @@ async fn compute_password_hash(password: String) -> color_eyre::eyre::Result<Str
                 Version::V0x13,
                 Params::new(15000, 2, 1, None)?,
             )
-            .hash_password(password.as_bytes(), &salt)?
+            .hash_password(password.expose_secret().as_bytes(), &salt)?
             .to_string();
 
             Ok(password_hash)

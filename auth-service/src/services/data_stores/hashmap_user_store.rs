@@ -47,12 +47,19 @@ impl UserStore for HashmapUserStore {
 
 #[cfg(test)]
 mod tests {
+    use secrecy::Secret;
+
     use super::*;
 
     #[tokio::test]
     async fn test_add_user() {
         let mut store = HashmapUserStore::default();
-        let user = User::new("toto@foo.com".to_string(), "password123".to_string(), true).unwrap();
+        let user = User::new(
+            "toto@foo.com".to_string(),
+            Secret::new("password123".to_string()),
+            true,
+        )
+        .unwrap();
         assert!(store.add_user(user.clone()).await.is_ok());
         let res = store.add_user(user.clone()).await;
         assert!(res.is_err());
@@ -64,7 +71,12 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         let mut store = HashmapUserStore::default();
-        let user = User::new("toto@foo.com".to_string(), "password123".to_string(), true).unwrap();
+        let user = User::new(
+            "toto@foo.com".to_string(),
+            Secret::new("password123".to_string()),
+            true,
+        )
+        .unwrap();
         assert!(store.add_user(user.clone()).await.is_ok());
         assert!(store.get_user(&user.email).await.is_ok());
         assert_eq!(store.get_user(&user.email).await.unwrap(), user);
@@ -73,21 +85,29 @@ mod tests {
     #[tokio::test]
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
-        let user = User::new("toto@foo.com".to_string(), "password123".to_string(), true).unwrap();
+        let user = User::new(
+            "toto@foo.com".to_string(),
+            Secret::new("password123".to_string()),
+            true,
+        )
+        .unwrap();
         assert!(store.add_user(user.clone()).await.is_ok());
         assert!(store
             .validate_user(&user.email, &user.password)
             .await
             .is_ok());
         let res = store
-            .validate_user(&user.email, &Password("wrongpassword".to_string()))
+            .validate_user(
+                &user.email,
+                &Password::parse(Secret::new("wrongpassword123".to_string())).unwrap(),
+            )
             .await;
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), UserStoreError::InvalidCredentials);
         let res = store
             .validate_user(
                 &Email("non_existent_email".to_string()),
-                &Password("password123".to_string()),
+                &Password::parse(Secret::new("password123".to_string())).unwrap(),
             )
             .await;
         assert!(res.is_err());

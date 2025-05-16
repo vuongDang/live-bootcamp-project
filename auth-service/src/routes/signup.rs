@@ -1,6 +1,7 @@
 use crate::domain::data_stores::UserStoreError;
 use crate::{domain::user::User, error::AuthAPIError, AppState};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use secrecy::Secret;
 use serde::Deserialize;
 
 #[tracing::instrument(name = "Signup", skip_all)]
@@ -27,7 +28,7 @@ pub async fn signup(
 #[derive(Deserialize)]
 pub struct SignupRequest {
     pub email: String,
-    pub password: String,
+    pub password: Secret<String>,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
 }

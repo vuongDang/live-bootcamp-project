@@ -5,12 +5,13 @@ use crate::utils::auth::generate_auth_cookie;
 use crate::{error::AuthAPIError, AppState};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use axum_extra::extract::CookieJar;
+use secrecy::Secret;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct LoginRequest {
     pub email: String,
-    pub password: String,
+    pub password: Secret<String>,
 }
 
 /// This function handles the login request.
@@ -26,7 +27,7 @@ pub async fn login(
     let email = Email::parse(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     // Password provided is not valid
     let password =
-        Password::parse(&request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
+        Password::parse(request.password).map_err(|_| AuthAPIError::InvalidCredentials)?;
 
     let validate_login_result = state
         .user_store
