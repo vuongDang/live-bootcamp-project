@@ -7,6 +7,7 @@ use crate::{
     LoginAttemptId, TwoFACode,
 };
 
+#[tracing::instrument(name = "verify_2fa", skip_all)]
 pub async fn verify_2fa(
     State(app): State<AppState>,
     jar: CookieJar,
@@ -38,10 +39,10 @@ pub async fn verify_2fa(
         .await
         .remove_code(&email)
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     // Set jwt cookie in the response
-    let auth_cookie = generate_auth_cookie(&email).map_err(|_| AuthAPIError::UnexpectedError)?;
+    let auth_cookie = generate_auth_cookie(&email).map_err(AuthAPIError::UnexpectedError)?;
     let updated_jar = jar.add(auth_cookie);
 
     Ok((updated_jar, StatusCode::OK))

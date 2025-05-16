@@ -1,9 +1,13 @@
+use crate::domain::data_stores::UserStoreError;
+use crate::{domain::user::User, error::AuthAPIError, AppState};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::Deserialize;
-use crate::{domain::user::User, error::AuthAPIError, AppState};
-use crate::domain::data_stores::UserStoreError;
 
-pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupRequest>) -> Result<impl IntoResponse, AuthAPIError> {
+#[tracing::instrument(name = "Signup", skip_all)]
+pub async fn signup(
+    State(state): State<AppState>,
+    Json(request): Json<SignupRequest>,
+) -> Result<impl IntoResponse, AuthAPIError> {
     let user = User::new(request.email, request.password, request.requires_2fa);
     if user.is_err() {
         return Err(AuthAPIError::InvalidCredentials);
@@ -14,12 +18,11 @@ pub async fn signup(State(state): State<AppState>, Json(request): Json<SignupReq
         Ok(_) => Ok((StatusCode::CREATED, Json("User created successfully"))),
         Err(err) => Err(match err {
             UserStoreError::UserAlreadyExists => AuthAPIError::UserAlreadyExists,
-            UserStoreError::UnexpectedError => AuthAPIError::UnexpectedError,
+            UserStoreError::UnexpectedError(e) => AuthAPIError::UnexpectedError(e.into()),
             _ => unreachable!("Unexpected error: {:?}", err),
         }),
     }
 }
-
 
 #[derive(Deserialize)]
 pub struct SignupRequest {

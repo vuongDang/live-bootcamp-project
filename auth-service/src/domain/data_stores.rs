@@ -1,4 +1,8 @@
+use color_eyre::eyre::eyre;
+use color_eyre::eyre::Report;
+use color_eyre::eyre::Result;
 use rand::Rng;
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::domain::email::Email;
@@ -15,20 +19,36 @@ pub trait UserStore: Send + Sync {
 }
 
 /// This enum defines the possible errors that can occur when interacting with the user store.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error)]
 pub enum UserStoreError {
+    #[error("User already exists")]
     UserAlreadyExists,
+    #[error("User not found")]
     UserNotFound,
+    #[error("Invalid credentials")]
     InvalidCredentials,
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
+}
+
+impl PartialEq for UserStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::UserAlreadyExists, Self::UserAlreadyExists)
+                | (Self::UserNotFound, Self::UserNotFound)
+                | (Self::InvalidCredentials, Self::InvalidCredentials)
+                | (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
 }
 
 impl From<sqlx::Error> for UserStoreError {
     fn from(err: sqlx::Error) -> Self {
         match err {
             sqlx::Error::RowNotFound => UserStoreError::UserNotFound,
-            sqlx::Error::Database(_) => UserStoreError::UnexpectedError,
-            _ => UserStoreError::UnexpectedError,
+            sqlx::Error::Database(e) => UserStoreError::UnexpectedError(e.into()),
+            _ => UserStoreError::UnexpectedError(err.into()),
         }
     }
 }
@@ -41,10 +61,12 @@ pub trait BannedTokenStore: Send + Sync {
     async fn remove_banned_token(&mut self, token: &str) -> Result<(), BannedTokenStoreError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum BannedTokenStoreError {
+    #[error("Connection error")]
     ConnectionError,
-    UnexpectedError(String),
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
 #[async_trait::async_trait]
@@ -62,10 +84,12 @@ pub trait TwoFACodeStore: Send + Sync {
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum TwoFACodeStoreError {
+    #[error("Login attempt id not found")]
     LoginAttemptIdNotFound,
-    UnexpectedError(String),
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,11 +100,11 @@ impl LoginAttemptId {
         LoginAttemptId(id)
     }
 
-    pub fn parse(id: &str) -> Result<Self, String> {
+    pub fn parse(id: &str) -> Result<Self> {
         if Uuid::parse_str(id).is_ok() {
             Ok(LoginAttemptId(id.to_string()))
         } else {
-            Err(format!("Invalid LoginAttemptId: {}", id))
+            Err(eyre!("Invalid LoginAttemptId: {}", id))
         }
     }
 }
@@ -107,12 +131,12 @@ impl TwoFACode {
         TwoFACode(random_string)
     }
 
-    pub fn parse(code: String) -> Result<Self, String> {
+    pub fn parse(code: String) -> Result<Self> {
         // Ensure `code` is a valid 6-digit code
         let is_valid = code.len() == 6 && code.chars().all(|c| c.is_digit(10));
         is_valid
             .then(|| TwoFACode(code.clone()))
-            .ok_or_else(|| format!("Invalid TwoFACode: {}", code))
+            .ok_or_else(|| eyre!("Invalid TwoFACode: {}", code))
     }
 }
 

@@ -1,14 +1,10 @@
 use crate::domain::email::Email;
+use color_eyre::eyre::Result;
 
 // This trait represents the interface all concrete email clients should implement
 #[async_trait::async_trait]
 pub trait EmailClient: Send + Sync {
-    async fn send_email(
-        &self,
-        recipient: &Email,
-        subject: &str,
-        content: &str,
-    ) -> Result<(), String>;
+    async fn send_email(&self, recipient: &Email, subject: &str, content: &str) -> Result<()>;
 }
 
 pub fn two_fa_login_email_template(email: &Email, code: &str) -> (String, String) {

@@ -1,12 +1,13 @@
+use color_eyre::eyre::{eyre, Result};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Password(pub String);
 
 impl Password {
-    pub fn parse(password: &str) -> Result<Self, String> {
+    pub fn parse(password: &str) -> Result<Self> {
         if Password::is_valid(password) {
             Ok(Password(password.to_string()))
         } else {
-            Err("Password not valid".to_string())
+            Err(eyre!("Password not valid"))
         }
     }
 

@@ -1,12 +1,14 @@
+use color_eyre::eyre::{eyre, Result};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Email(pub String);
 
 impl Email {
-    pub fn parse(email: &str) -> Result<Self, String> {
+    pub fn parse(email: &str) -> Result<Self> {
         if Email::is_valid(email) {
             Ok(Email(email.to_string()))
         } else {
-            Err("Email not valid".to_string())
+            Err(eyre!("Email not valid"))
         }
     }
 

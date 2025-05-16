@@ -16,6 +16,7 @@ pub struct LoginRequest {
 /// This function handles the login request.
 /// It validates the email and password, checks if the user exists,
 /// and if 2FA is required.
+#[tracing::instrument(name = "Login", skip_all)]
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -38,7 +39,7 @@ pub async fn login(
         UserStoreError::UserNotFound => AuthAPIError::AuthenticationFailure,
         // Credentials provided do not match the ones in the database
         UserStoreError::InvalidCredentials => AuthAPIError::AuthenticationFailure,
-        _ => AuthAPIError::UnexpectedError,
+        e => AuthAPIError::UnexpectedError(e.into()),
     })?;
 
     let user_store = state.user_store.read().await;
@@ -46,7 +47,7 @@ pub async fn login(
     let user = user_store
         .get_user(&email)
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
     if user.requires_2fa {
         handle_2fa(&email, &state, jar).await
     } else {
@@ -56,17 +57,19 @@ pub async fn login(
 
 /// This function handles the case where 2FA is not required for login.
 /// It generates a new auth cookie and returns it in the response.
+#[tracing::instrument(name = "Login without 2FA", skip_all)]
 async fn handle_no_2fa(
     email: &Email,
     jar: CookieJar,
 ) -> Result<(CookieJar, (StatusCode, Json<LoginResponse>)), AuthAPIError> {
-    let auth_cookie = generate_auth_cookie(&email).map_err(|_| AuthAPIError::UnexpectedError)?;
+    let auth_cookie = generate_auth_cookie(&email).map_err(|e| AuthAPIError::UnexpectedError(e))?;
     let updated_jar = jar.add(auth_cookie);
     Ok((updated_jar, (StatusCode::OK, Json(LoginResponse::No2FA))))
 }
 
 /// This function handles the case where 2FA is required for login.
 /// It generates a new 2FA code and stores it in the 2FA code store.
+#[tracing::instrument(name = "Login with 2FA", skip_all)]
 async fn handle_2fa(
     email: &Email,
     state: &AppState,
@@ -82,7 +85,7 @@ async fn handle_2fa(
         .await
         .add_code(email, two_fa_code.clone(), login_attempt_id.clone())
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     // Send the 2FA code to the user via email
     let (subject, content) =
@@ -94,7 +97,7 @@ async fn handle_2fa(
         .await
         .send_email(email, &subject, &content)
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
 
     Ok((
         jar,

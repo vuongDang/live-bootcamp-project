@@ -7,6 +7,7 @@ pub struct VerifyTokenRequest {
     token: String,
 }
 
+#[tracing::instrument(name = "verify_token", skip_all)]
 pub async fn verify_token(
     State(app): State<AppState>,
     Json(request): Json<VerifyTokenRequest>,
@@ -23,7 +24,7 @@ pub async fn verify_token(
         .await
         .is_token_banned(&jwt)
         .await
-        .map_err(|_| AuthAPIError::UnexpectedError)?;
+        .map_err(|e| AuthAPIError::UnexpectedError(e.into()))?;
     if is_token_banned {
         return Err(AuthAPIError::InvalidToken);
     }
