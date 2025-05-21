@@ -6,12 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dev-dependencies]
-reqwest = { version = "0.11.26", default-features = false, features = [
-    "json",
-    "cookies",
-] }
 fake = { version = "4" }
 quickcheck = "1"
+wiremock = "0.6.0"
 
 [dependencies]
 axum = "0.7.4"
@@ -44,3 +41,8 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 tracing-error = "0.2.0"
 secrecy = { version = "0.8.0", features = ["serde"] }
+reqwest = { version = "0.11.26", default-features = false, features = [
+    "json",
+    "cookies",
+    "rustls-tls",
+] }

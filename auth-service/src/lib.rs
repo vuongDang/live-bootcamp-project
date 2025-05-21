@@ -4,6 +4,7 @@ pub mod routes;
 mod services;
 pub mod utils;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
+pub use crate::services::email_clients;
 use app_state::AppState;
 use axum::http::Method;
 use axum::{routing::post, serve::Serve, Router};

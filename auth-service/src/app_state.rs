@@ -7,10 +7,15 @@ use crate::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeSto
 use crate::services::data_stores::hashmap_user_store::HashmapUserStore;
 use crate::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
 use crate::services::data_stores::redis_two_fa_code_store::RedisTwoFACodeStore;
+use crate::services::email_clients::postmark_email_client::PostmarkEmailClient;
+use crate::utils::constants::prod;
 use crate::utils::constants::DATABASE_URL;
+use crate::utils::constants::POSTMARK_AUTH_TOKEN;
 use crate::utils::constants::REDIS_HOST_NAME;
+use crate::Email;
 use crate::PostgresUserStore;
 use crate::RedisBannedTokenStore;
+use reqwest::Client;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -54,9 +59,7 @@ impl AppState {
         let two_fa_code_store = Arc::new(RwLock::new(RedisTwoFACodeStore::new(Arc::new(
             RwLock::new(configure_redis()),
         ))));
-        let email_client = Arc::new(RwLock::new(
-            crate::services::mock_email_client::MockEmailClient::default(),
-        ));
+        let email_client = Arc::new(RwLock::new(configure_postmark_email_client()));
 
         Self {
             user_store,
@@ -74,7 +77,7 @@ impl Default for AppState {
             banned_token_store: Arc::new(RwLock::new(HashsetBannedTokenStore::default())),
             two_fa_code_store: Arc::new(RwLock::new(HashmapTwoFACodeStore::default())),
             email_client: Arc::new(RwLock::new(
-                crate::services::mock_email_client::MockEmailClient::default(),
+                crate::services::email_clients::mock_email_client::MockEmailClient::default(),
             )),
         }
     }
@@ -100,4 +103,18 @@ fn configure_redis() -> redis::Connection {
         .expect("Failed to get Redis client")
         .get_connection()
         .expect("Failed to get Redis connection")
+}
+
+fn configure_postmark_email_client() -> PostmarkEmailClient {
+    let http_client = Client::builder()
+        .timeout(prod::email_client::TIMEOUT)
+        .build()
+        .expect("Failed to build HTTP client");
+
+    PostmarkEmailClient::new(
+        prod::email_client::BASE_URL.to_owned(),
+        Email::parse(&prod::email_client::SENDER.to_owned()).unwrap(),
+        POSTMARK_AUTH_TOKEN.to_owned(),
+        http_client,
+    )
 }

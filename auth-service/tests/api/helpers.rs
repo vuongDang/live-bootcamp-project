@@ -1,10 +1,14 @@
 use auth_service::app_state::*;
+use auth_service::email_clients::postmark_email_client::PostmarkEmailClient;
 use auth_service::get_postgres_pool;
 use auth_service::routes::LoginResponse;
 use auth_service::utils::constants::*;
 use auth_service::Application;
+use auth_service::Email;
 use auth_service::PostgresUserStore;
 use reqwest::cookie::Jar;
+use reqwest::Client;
+use secrecy::Secret;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::Connection;
@@ -13,7 +17,13 @@ use sqlx::PgConnection;
 use sqlx::PgPool;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
+use wiremock::matchers::method;
+use wiremock::matchers::path;
+use wiremock::Mock;
+use wiremock::MockServer;
+use wiremock::ResponseTemplate;
 
 pub struct TestApp {
     pub address: String,
@@ -21,6 +31,7 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_tokens: BannedTokenStoreType,
     pub two_fa_code_store: TwoFACodeStoreType,
+    pub email_server: MockServer,
     pub db_name: String,
     cleanup_called: bool,
 }
@@ -32,6 +43,12 @@ impl TestApp {
         // Reconfigure the PostgreSQL database for testing and get db name
         let (db_pool, db_name) = configure_postgresql_test().await;
         app_state.user_store = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(db_pool)));
+
+        // Configure the email server
+        let email_server = MockServer::start().await;
+        let base_url = email_server.uri();
+        let email_client = Arc::new(RwLock::new(configure_postmark_email_client(base_url)));
+        app_state.email_client = email_client;
 
         let banned_tokens = app_state.banned_token_store.clone();
         let two_fa_code_store = app_state.two_fa_code_store.clone();
@@ -60,6 +77,7 @@ impl TestApp {
             banned_tokens,
             two_fa_code_store,
             db_name,
+            email_server,
             cleanup_called: false,
         };
 
@@ -178,6 +196,17 @@ pub async fn app_signup_and_login(
     with_2fa: bool,
 ) -> (TestApp, String, String, Option<String>, Option<String>) {
     let (app, email, password) = app_signup(with_2fa).await;
+
+    // Setup up email mock server if 2FA enabled
+    if with_2fa {
+        // Define an expectation for the mock server
+        Mock::given(path("/email")) // Expect an HTTP request to the "/email" path
+            .and(method("POST")) // Expect the HTTP method to be POST
+            .respond_with(ResponseTemplate::new(200)) // Respond with an HTTP 200 OK status
+            .expect(1) // Expect this request to be made exactly once
+            .mount(&app.email_server) // Mount this expectation on the mock email server
+            .await; // Await the asynchronous operation to ensure the mock server is set up before proceeding
+    }
 
     let login_body = serde_json::json!({
         "email": email.clone(),
@@ -306,4 +335,17 @@ async fn delete_database(db_name: &str) {
         .execute(format!(r#"DROP DATABASE "{}";"#, db_name).as_str())
         .await
         .expect("Failed to drop the database.");
+}
+
+fn configure_postmark_email_client(base_url: String) -> PostmarkEmailClient {
+    let postmark_auth_token = Secret::new("auth_token".to_owned());
+
+    let sender = Email::parse(&test::email_client::SENDER.to_owned()).unwrap();
+
+    let http_client = Client::builder()
+        .timeout(test::email_client::TIMEOUT)
+        .build()
+        .expect("Failed to build HTTP client");
+
+    PostmarkEmailClient::new(base_url, sender, postmark_auth_token, http_client)
 }

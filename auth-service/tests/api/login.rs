@@ -2,6 +2,8 @@ use crate::helpers::{app_signup, get_random_email};
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 use auth_service::{routes::TwoFactorLoginResponse, Email};
 use reqwest::{cookie::CookieStore, Url};
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn valid_login_without_2fa_returns_200() {
@@ -125,6 +127,15 @@ async fn incorrect_login_returns_401() {
 #[tokio::test]
 async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     let (mut app, email, pwd) = app_signup(true).await;
+
+    // Define an expectation for the mock server
+    Mock::given(path("/email")) // Expect an HTTP request to the "/email" path
+        .and(method("POST")) // Expect the HTTP method to be POST
+        .respond_with(ResponseTemplate::new(200)) // Respond with an HTTP 200 OK status
+        .expect(1) // Expect this request to be made exactly once
+        .mount(&app.email_server) // Mount this expectation on the mock email server
+        .await; // Await the asynchronous operation to ensure the mock server is set up before proceeding
+
     let login_body = serde_json::json!({
         "email": email,
         "password": pwd,
